@@ -1,0 +1,21 @@
+[MAIN]
+# Use multiple processes to speed up Pylint
+jobs = 1
+
+[MESSAGES CONTROL]
+# Disable checks that are not useful for this project:
+# - import-error: macOS-only imports (AppKit, WebKit, Foundation) and optional deps (pytest)
+# - import-outside-toplevel: intentional lazy imports for macOS frameworks
+disable =
+    import-error
+
+[FORMAT]
+max-line-length = 100
+
+[DESIGN]
+# test files legitimately have many simple methods
+min-public-methods = 1
+
+[BASIC]
+# Allow long test method names and do_GET (BaseHTTPRequestHandler convention)
+method-rgx = [a-z_][a-z0-9_]{2,60}$|do_[A-Z]+$

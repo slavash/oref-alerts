@@ -1,6 +1,6 @@
+"""macOS WebKit popup window for displaying alert locations on a map."""
 from __future__ import annotations
 
-import json
 import os
 import signal
 
@@ -11,20 +11,23 @@ from _alert.ipc import read_alerts
 from _alert.lock import hold_lock
 
 
-def run_popup(config: Config) -> None:
-    import AppKit
-    import WebKit
-    from Foundation import NSObject, NSURL, NSTimer
+def run_popup(config: Config) -> None:  # pylint: disable=too-many-locals,too-many-statements
+    """Launch a floating WebKit popup showing alert locations on a Leaflet map."""
+    import AppKit  # pylint: disable=import-outside-toplevel,import-error
+    import WebKit  # pylint: disable=import-outside-toplevel,import-error
+    from Foundation import NSObject, NSURL, NSTimer  # pylint: disable=import-outside-toplevel,import-error
 
-    with hold_lock(config.popup_lock_path) as lock_fd:
+    with hold_lock(config.popup_lock_path) as _lock_fd:
         alerts = read_alerts(config.alerts_ipc_path)
         cities_db = load_cities(config.cities_json_path)
         seen_count = len(alerts)
         html = build_html(alerts, cities_db, config.map_template_path)
 
-        class AppDelegate(NSObject):
-            def applicationDidFinishLaunching_(self, _note):
-                pass
+        class AppDelegate(NSObject):  # pylint: disable=too-few-public-methods
+            """Minimal NSApp delegate."""
+
+            def applicationDidFinishLaunching_(self, _note):  # pylint: disable=invalid-name
+                """Called when the application finishes launching."""
 
         app = AppKit.NSApplication.sharedApplication()
         app.setActivationPolicy_(AppKit.NSApplicationActivationPolicyAccessory)

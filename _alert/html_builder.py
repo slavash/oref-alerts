@@ -1,9 +1,11 @@
+"""Map HTML generation — injects alert and city data into the Leaflet template."""
 from __future__ import annotations
 
 import json
 
 
 def build_html(alerts: list[dict], cities_db: list[dict], template_path: str) -> str:
+    """Return the map HTML with *alerts* and *cities_db* injected."""
     with open(template_path, encoding="utf-8") as f:
         template = f.read()
 

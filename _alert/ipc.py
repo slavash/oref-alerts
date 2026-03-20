@@ -1,3 +1,4 @@
+"""Inter-process communication via a shared JSON file."""
 from __future__ import annotations
 
 import json
@@ -5,6 +6,7 @@ import os
 
 
 def append_alert(alert: dict, ipc_path: str) -> None:
+    """Append *alert* to the IPC JSON file at *ipc_path*."""
     alerts = read_alerts(ipc_path)
     alerts.append(alert)
     with open(ipc_path, "w", encoding="utf-8") as f:
@@ -12,6 +14,7 @@ def append_alert(alert: dict, ipc_path: str) -> None:
 
 
 def read_alerts(ipc_path: str) -> list[dict]:
+    """Read all alerts from the IPC JSON file."""
     if not os.path.exists(ipc_path):
         return []
     try:

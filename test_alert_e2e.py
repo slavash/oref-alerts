@@ -4,25 +4,22 @@ Tests exercise the tool's external contract: CLI invocation, file I/O,
 and IPC behavior. They do NOT depend on internal module structure so they
 survive refactoring.
 """
+# pylint: disable=missing-function-docstring
 from __future__ import annotations
 
 import json
 import os
 import subprocess
 import sys
-import tempfile
 import textwrap
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from threading import Thread
-from unittest.mock import patch
-
-import pytest
 
 PROJECT_DIR = Path(__file__).resolve().parent
-PYTHON = str(PROJECT_DIR / ".venv" / "bin" / "python3")
-if not os.path.exists(PYTHON):
-    PYTHON = sys.executable
+_PYTHON = str(PROJECT_DIR / ".venv" / "bin" / "python3")
+if not os.path.exists(_PYTHON):
+    _PYTHON = sys.executable
 
 SAMPLE_ALERT = {
     "id": "999000111",
@@ -49,12 +46,13 @@ SAMPLE_ALERT_NO_LOCAL = {
 def _run_python(code: str, timeout: int = 10) -> subprocess.CompletedProcess:
     """Run a snippet of Python in the project venv, with project dir on sys.path."""
     return subprocess.run(
-        [PYTHON, "-c", code],
+        [_PYTHON, "-c", code],
         capture_output=True,
         text=True,
         timeout=timeout,
         cwd=str(PROJECT_DIR),
         env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        check=False,
     )
 
 
@@ -269,14 +267,15 @@ class _FakeAlertHandler(BaseHTTPRequestHandler):
     response_body: bytes = b""
     response_code: int = 200
 
-    def do_GET(self):
+    def do_GET(self):  # pylint: disable=invalid-name
+        """Handle GET requests with the configured canned response."""
         self.send_response(self.response_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.end_headers()
         self.wfile.write(self.response_body)
 
     def log_message(self, *args):
-        pass  # suppress output
+        """Suppress server log output during tests."""
 
 
 def _start_server(body: bytes, code: int = 200) -> tuple[HTTPServer, int]:
@@ -505,12 +504,14 @@ class TestMapPopupCLI:
     """Verify map_popup.py standalone CLI behavior."""
 
     def test_no_args_prints_usage_and_exits_nonzero(self):
+        """Running map_popup.py with no args should print usage and exit 1."""
         result = subprocess.run(
-            [PYTHON, str(PROJECT_DIR / "map_popup.py")],
+            [_PYTHON, str(PROJECT_DIR / "map_popup.py")],
             capture_output=True,
             text=True,
             timeout=10,
             cwd=str(PROJECT_DIR),
+            check=False,
         )
         assert result.returncode == 1
         assert "Usage:" in result.stdout or "usage" in result.stdout.lower()

@@ -25,23 +25,29 @@ seen_ids = _dedup.seen_ids
 
 
 def fetch_alert() -> dict | None:
+    """Fetch the latest alert from the configured OREF API."""
     return _fetch_alert(URL, HEADERS)
 
 
 def log_raw(alert: dict) -> None:
+    """Write a raw JSON log entry for *alert*."""
     write_raw_entry(alert, RAW_LOG)
 
 
 def beep_if_local(alert: dict) -> None:
+    """Play an audible beep if the alert affects MY_LOCATION."""
     _beep_if_local(alert, MY_LOCATION)
 
 
 def ensure_log_files() -> None:
+    """Create the raw log file if it does not already exist."""
     if not os.path.exists(RAW_LOG):
-        open(RAW_LOG, "w", encoding="utf-8").close()
+        with open(RAW_LOG, "w", encoding="utf-8"):
+            pass
 
 
 def main() -> None:
+    """Run the main polling loop."""
     ensure_log_files()
     print(f"Polling {URL} every {POLL_INTERVAL}s …")
     print(f"Raw log: {RAW_LOG}")

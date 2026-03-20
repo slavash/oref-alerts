@@ -1,0 +1,7 @@
+# Runtime (macOS only)
+pyobjc-framework-Cocoa>=9.0; sys_platform == "darwin"
+pyobjc-framework-WebKit>=9.0; sys_platform == "darwin"
+
+# Development / testing
+pytest>=7.0
+pylint>=2.17

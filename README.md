@@ -56,21 +56,29 @@ alert/
 - macOS 10.13+
 - Network access to OREF API
 
-### Setup
+### Setup (pip)
 
 ```bash
-# Clone or download the project
 cd alert
 
-# Create a virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies (if any)
-pip install -r requirements.txt  # if present
+pip install -r requirements.txt
 
 # Set your location
-export MY_LOCATION="Tel Aviv"
+export OREF_MY_LOCATION="חיפה"
+```
+
+### Setup (Poetry)
+
+```bash
+cd alert
+
+poetry install
+
+# Set your location
+export OREF_MY_LOCATION="חיפה"
 ```
 
 ## Configuration
@@ -98,7 +106,11 @@ export ALERTS_IPC_FILE="~/.alert_ipc.json"
 ### Start the Alert Monitor
 
 ```bash
+# With pip / venv
 python alert.py
+
+# With Poetry
+poetry run python alert.py
 ```
 
 The tool will:
@@ -159,7 +171,11 @@ See [design-doc.md](design-doc.md) for detailed architectural rationale.
 Run the end-to-end test suite:
 
 ```bash
-python test_alert_e2e.py -v
+# With pip / venv
+pytest test_alert_e2e.py -v
+
+# With Poetry
+poetry run pytest test_alert_e2e.py -v
 ```
 
 Tests verify:
@@ -192,7 +208,8 @@ Tests verify:
 
 - **Leaflet.js**: Map rendering library (bundled in `map.html`)
 - **OpenStreetMap**: Map tile provider (attribution included)
-- **Standard Library**: No external Python dependencies required
+- **pyobjc-framework-Cocoa / WebKit**: macOS native UI (installed via `requirements.txt` or Poetry)
+- **pytest**: Test runner (dev dependency)
 
 ## License
 

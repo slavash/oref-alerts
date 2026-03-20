@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Alert:
+    """Immutable representation of an OREF emergency alert."""
+
     id: str
     cat: str = ""
     title: str = "Alert"
@@ -16,7 +18,8 @@ class Alert:
     original_countdown: int = 0
 
     @classmethod
-    def from_dict(cls, d: dict) -> Alert:
+    def from_dict(cls, d: dict) -> "Alert":
+        """Create an Alert from a raw API response dict."""
         return cls(
             id=d.get("id", ""),
             cat=d.get("cat", ""),
@@ -28,6 +31,7 @@ class Alert:
         )
 
     def to_dict(self) -> dict:
+        """Serialize the alert back to a plain dict."""
         return {
             "id": self.id,
             "cat": self.cat,

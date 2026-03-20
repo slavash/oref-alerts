@@ -1,3 +1,4 @@
+"""Centralized configuration with environment variable overrides."""
 from __future__ import annotations
 
 import os
@@ -16,7 +17,8 @@ def _env_int(key: str, default: int) -> int:
 
 
 @dataclass
-class Config:
+class Config:  # pylint: disable=too-many-instance-attributes
+    """Application configuration populated from env vars with sensible defaults."""
     api_url: str = field(default_factory=lambda: _env(
         "OREF_API_URL", "https://www.oref.org.il/WarningMessages/Alert/alerts.json"))
     poll_interval: int = field(default_factory=lambda: _env_int("OREF_POLL_INTERVAL", 2))
@@ -28,7 +30,8 @@ class Config:
     raw_log_path: str = field(
         default_factory=lambda: _env("OREF_RAW_LOG", os.path.join(_DIR, "alerts_raw.txt")))
     my_location: str = field(default_factory=lambda: _env("OREF_MY_LOCATION", "חיפה"))
-    auto_close_seconds: int = field(default_factory=lambda: _env_int("OREF_AUTO_CLOSE_SECONDS", 60))
+    auto_close_seconds: int = field(
+        default_factory=lambda: _env_int("OREF_AUTO_CLOSE_SECONDS", 60))
     alerts_ipc_path: str = field(
         default_factory=lambda: _env("OREF_ALERTS_IPC", "/tmp/oref_alerts.json"))
     popup_lock_path: str = field(
@@ -38,8 +41,10 @@ class Config:
     map_template_path: str = field(
         default_factory=lambda: _env("OREF_MAP_TEMPLATE", os.path.join(_DIR, "map.html")))
     venv_python_path: str = field(
-        default_factory=lambda: _env("OREF_VENV_PYTHON", os.path.join(_DIR, ".venv", "bin", "python3")))
+        default_factory=lambda: _env(
+            "OREF_VENV_PYTHON", os.path.join(_DIR, ".venv", "bin", "python3")))
 
 
 def default_config() -> Config:
+    """Return a Config instance with all defaults applied."""
     return Config()
