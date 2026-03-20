@@ -58,7 +58,6 @@ def main() -> None:
         if alert and alert.get("id") and alert["id"] not in seen_ids:
             seen_ids.add(alert["id"])
             print(f"[{datetime.now():%H:%M:%S}] new alert: {alert['id']}")
-            log_formatted(alert)
             log_raw(alert)
             beep_if_local(alert)
             send_to_popup(alert)
