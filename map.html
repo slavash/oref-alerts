@@ -58,7 +58,12 @@ function init() {
     const resolved = [];
     const unresolved = [];
     alertCities.forEach(name => {
-      const coord = lookup[name];
+      let coord = lookup[name];
+      if (!coord) {
+        const prefix = name + ' - ';
+        const key = Object.keys(lookup).find(k => k.startsWith(prefix));
+        if (key) coord = lookup[key];
+      }
       if (coord) { resolved.push({ name, ...coord }); allResolved.push({ name, ...coord }); }
       else unresolved.push(name);
     });

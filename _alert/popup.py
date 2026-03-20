@@ -48,7 +48,7 @@ def run_popup(config: Config) -> None:  # pylint: disable=too-many-locals,too-ma
             AppKit.NSBackingStoreBuffered,
             False,
         )
-        window.setTitle_("Alert")
+        window.setTitle_(alerts[0].get("title", "Alert") if alerts else "Alert")
         window.setLevel_(AppKit.NSFloatingWindowLevel)
         window.setCollectionBehavior_(
             AppKit.NSWindowCollectionBehaviorCanJoinAllSpaces
