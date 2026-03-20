@@ -17,9 +17,9 @@ from pathlib import Path
 from threading import Thread
 
 PROJECT_DIR = Path(__file__).resolve().parent
-_PYTHON = str(PROJECT_DIR / ".venv" / "bin" / "python3")
+_PYTHON = str(PROJECT_DIR / ".venv" / "bin" / "python3")  # pylint: disable=invalid-name
 if not os.path.exists(_PYTHON):
-    _PYTHON = sys.executable
+    _PYTHON = sys.executable  # pylint: disable=invalid-name
 
 SAMPLE_ALERT = {
     "id": "999000111",
