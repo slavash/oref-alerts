@@ -43,7 +43,6 @@ alert/
 │   ├── html_builder.py     # Map HTML generation
 │   ├── ipc.py              # Inter-process communication
 │   ├── lock.py             # File locking utilities
-│   ├── log_formatted.py    # Human-readable logging
 │   ├── log_raw.py          # Raw JSON logging
 │   ├── popup.py            # Popup window management
 │   └── popup_launcher.py   # Process lifecycle
@@ -90,7 +89,6 @@ export MY_LOCATION="Your City Name"
 export AUTO_CLOSE_SECONDS="60"
 
 # Logging
-export FORMATTED_LOG_PATH="~/.alert_formatted.log"
 export RAW_LOG_PATH="~/.alert_raw.log"
 export ALERTS_IPC_FILE="~/.alert_ipc.json"
 ```
@@ -147,7 +145,7 @@ The project follows a modular, testable architecture with clear separation of co
 - **Data Models** (`alert_model.py`): Type-safe alert representation
 - **API Integration** (`fetcher.py`): Handles HTTP requests and response parsing
 - **Deduplication** (`dedup.py`): Stateful deduplication logic
-- **Logging** (`log_formatted.py`, `log_raw.py`): Dual-format persistence
+- **Logging** (`log_raw.py`): JSON-per-line log persistence
 - **Notifications** (`beep.py`): Audio alerts via osascript
 - **IPC** (`ipc.py`, `lock.py`): Inter-process communication with file locking
 - **UI** (`popup_launcher.py`, `popup.py`): macOS WebKit popup management

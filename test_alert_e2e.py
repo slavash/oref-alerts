@@ -58,70 +58,7 @@ def _run_python(code: str, timeout: int = 10) -> subprocess.CompletedProcess:
     )
 
 
-# ── 1. Formatted log output ─────────────────────────────────────────────
-
-class TestFormattedLog:
-    """Verify that log_formatted writes the expected structured line."""
-
-    def test_log_formatted_writes_expected_fields(self, tmp_path):
-        log_file = tmp_path / "fmt.txt"
-        alert_json = json.dumps(SAMPLE_ALERT, ensure_ascii=False)
-        code = textwrap.dedent(f"""\
-            import json, sys, os
-            sys.path.insert(0, {str(PROJECT_DIR)!r})
-            import alert as a
-            a.FORMATTED_LOG = {str(log_file)!r}
-            a.log_formatted(json.loads({alert_json!r}))
-        """)
-        result = _run_python(code)
-        assert result.returncode == 0, result.stderr
-
-        content = log_file.read_text(encoding="utf-8")
-        assert "ID: 999000111" in content
-        assert "Title: ירי רקטות וטילים" in content
-        assert "Zone: גליל" in content
-        assert "חיפה - מערב" in content
-        assert "נהריה" in content
-        assert "Estimated time:" in content
-
-    def test_log_formatted_handles_missing_optional_fields(self, tmp_path):
-        log_file = tmp_path / "fmt2.txt"
-        minimal = {"id": "1", "data": ["a"]}
-        alert_json = json.dumps(minimal, ensure_ascii=False)
-        code = textwrap.dedent(f"""\
-            import json, sys
-            sys.path.insert(0, {str(PROJECT_DIR)!r})
-            import alert as a
-            a.FORMATTED_LOG = {str(log_file)!r}
-            a.log_formatted(json.loads({alert_json!r}))
-        """)
-        result = _run_python(code)
-        assert result.returncode == 0, result.stderr
-        content = log_file.read_text(encoding="utf-8")
-        assert "ID: 1" in content
-        assert "Title: Alert" in content  # default
-
-    def test_log_formatted_appends_multiple_entries(self, tmp_path):
-        log_file = tmp_path / "fmt3.txt"
-        a1 = json.dumps({"id": "1", "data": ["x"]}, ensure_ascii=False)
-        a2 = json.dumps({"id": "2", "data": ["y"]}, ensure_ascii=False)
-        code = textwrap.dedent(f"""\
-            import json, sys
-            sys.path.insert(0, {str(PROJECT_DIR)!r})
-            import alert as a
-            a.FORMATTED_LOG = {str(log_file)!r}
-            a.log_formatted(json.loads({a1!r}))
-            a.log_formatted(json.loads({a2!r}))
-        """)
-        result = _run_python(code)
-        assert result.returncode == 0, result.stderr
-        lines = log_file.read_text(encoding="utf-8").strip().split("\n")
-        assert len(lines) == 2
-        assert "ID: 1" in lines[0]
-        assert "ID: 2" in lines[1]
-
-
-# ── 2. Raw log output ───────────────────────────────────────────────────
+# ── 1. Raw log output ────────────────────────────────────────────────────
 
 class TestRawLog:
     """Verify that log_raw writes valid JSON per line."""
@@ -169,42 +106,33 @@ class TestRawLog:
 class TestEnsureLogFiles:
     """Verify ensure_log_files creates missing files."""
 
-    def test_creates_missing_log_files(self, tmp_path):
-        fmt = tmp_path / "fmt.txt"
+    def test_creates_missing_log_file(self, tmp_path):
         raw = tmp_path / "raw.txt"
         code = textwrap.dedent(f"""\
             import sys
             sys.path.insert(0, {str(PROJECT_DIR)!r})
             import alert as a
-            a.FORMATTED_LOG = {str(fmt)!r}
             a.RAW_LOG = {str(raw)!r}
             a.ensure_log_files()
         """)
-        assert not fmt.exists()
         assert not raw.exists()
         result = _run_python(code)
         assert result.returncode == 0, result.stderr
-        assert fmt.exists()
         assert raw.exists()
-        assert fmt.read_text() == ""
         assert raw.read_text() == ""
 
-    def test_does_not_truncate_existing_files(self, tmp_path):
-        fmt = tmp_path / "fmt.txt"
+    def test_does_not_truncate_existing_file(self, tmp_path):
         raw = tmp_path / "raw.txt"
-        fmt.write_text("existing\n")
         raw.write_text("existing\n")
         code = textwrap.dedent(f"""\
             import sys
             sys.path.insert(0, {str(PROJECT_DIR)!r})
             import alert as a
-            a.FORMATTED_LOG = {str(fmt)!r}
             a.RAW_LOG = {str(raw)!r}
             a.ensure_log_files()
         """)
         result = _run_python(code)
         assert result.returncode == 0, result.stderr
-        assert fmt.read_text() == "existing\n"
         assert raw.read_text() == "existing\n"
 
 
@@ -442,20 +370,16 @@ class TestDeduplication:
     """Verify the polling loop skips already-seen alert IDs."""
 
     def test_same_alert_id_logged_only_once(self, tmp_path):
-        fmt_log = tmp_path / "fmt.txt"
         raw_log = tmp_path / "raw.txt"
         alert_json = json.dumps(SAMPLE_ALERT, ensure_ascii=False)
-        # Simulate two fetch cycles returning the same alert
         code = textwrap.dedent(f"""\
             import json, sys, os
             sys.path.insert(0, {str(PROJECT_DIR)!r})
             import alert as a
 
-            a.FORMATTED_LOG = {str(fmt_log)!r}
             a.RAW_LOG = {str(raw_log)!r}
             a.ensure_log_files()
 
-            # Patch send_to_popup and beep to avoid side effects
             import map_popup
             map_popup.send_to_popup = lambda x: None
             a.send_to_popup = lambda x: None
@@ -463,24 +387,19 @@ class TestDeduplication:
 
             alert_data = json.loads({alert_json!r})
 
-            # Simulate two poll iterations with the same alert
             for _ in range(3):
                 alert = alert_data
                 if alert and alert.get("id") and alert["id"] not in a.seen_ids:
                     a.seen_ids.add(alert["id"])
-                    a.log_formatted(alert)
                     a.log_raw(alert)
         """)
         result = _run_python(code)
         assert result.returncode == 0, result.stderr
 
-        fmt_lines = fmt_log.read_text(encoding="utf-8").strip().split("\n")
         raw_lines = raw_log.read_text(encoding="utf-8").strip().split("\n")
-        assert len(fmt_lines) == 1, f"Expected 1 formatted entry, got {len(fmt_lines)}"
         assert len(raw_lines) == 1, f"Expected 1 raw entry, got {len(raw_lines)}"
 
     def test_different_alert_ids_both_logged(self, tmp_path):
-        fmt_log = tmp_path / "fmt.txt"
         raw_log = tmp_path / "raw.txt"
         a1 = json.dumps(SAMPLE_ALERT, ensure_ascii=False)
         a2 = json.dumps(SAMPLE_ALERT_NO_LOCAL, ensure_ascii=False)
@@ -489,7 +408,6 @@ class TestDeduplication:
             sys.path.insert(0, {str(PROJECT_DIR)!r})
             import alert as a
 
-            a.FORMATTED_LOG = {str(fmt_log)!r}
             a.RAW_LOG = {str(raw_log)!r}
             a.ensure_log_files()
 
@@ -501,17 +419,15 @@ class TestDeduplication:
             for alert_data in [json.loads({a1!r}), json.loads({a2!r})]:
                 if alert_data and alert_data.get("id") and alert_data["id"] not in a.seen_ids:
                     a.seen_ids.add(alert_data["id"])
-                    a.log_formatted(alert_data)
                     a.log_raw(alert_data)
         """)
         result = _run_python(code)
         assert result.returncode == 0, result.stderr
 
-        fmt_lines = fmt_log.read_text(encoding="utf-8").strip().split("\n")
-        assert len(fmt_lines) == 2
+        raw_lines = raw_log.read_text(encoding="utf-8").strip().split("\n")
+        assert len(raw_lines) == 2
 
     def test_alert_without_id_is_skipped(self, tmp_path):
-        fmt_log = tmp_path / "fmt.txt"
         raw_log = tmp_path / "raw.txt"
         no_id = json.dumps({"data": ["x"]}, ensure_ascii=False)
         code = textwrap.dedent(f"""\
@@ -519,7 +435,6 @@ class TestDeduplication:
             sys.path.insert(0, {str(PROJECT_DIR)!r})
             import alert as a
 
-            a.FORMATTED_LOG = {str(fmt_log)!r}
             a.RAW_LOG = {str(raw_log)!r}
             a.ensure_log_files()
             a.beep_if_local = lambda x: None
@@ -530,12 +445,11 @@ class TestDeduplication:
             alert = json.loads({no_id!r})
             if alert and alert.get("id") and alert["id"] not in a.seen_ids:
                 a.seen_ids.add(alert["id"])
-                a.log_formatted(alert)
                 a.log_raw(alert)
         """)
         result = _run_python(code)
         assert result.returncode == 0, result.stderr
-        assert fmt_log.read_text(encoding="utf-8") == ""
+        assert raw_log.read_text(encoding="utf-8") == ""
 
 
 # ── 8. Beep-if-local logic ──────────────────────────────────────────────
@@ -608,7 +522,6 @@ class TestFullPipeline:
     """Simulate a single poll cycle through the main loop logic."""
 
     def test_single_poll_cycle_creates_all_outputs(self, tmp_path):
-        fmt_log = tmp_path / "fmt.txt"
         raw_log = tmp_path / "raw.txt"
         ipc_file = tmp_path / "ipc.json"
 
@@ -623,12 +536,10 @@ class TestFullPipeline:
                 import map_popup as mp
 
                 a.URL = "http://127.0.0.1:{port}/"
-                a.FORMATTED_LOG = {str(fmt_log)!r}
                 a.RAW_LOG = {str(raw_log)!r}
                 mp.ALERTS_IPC = {str(ipc_file)!r}
                 a.ensure_log_files()
 
-                # Disable beep and popup launch
                 a.beep_if_local = lambda x: None
                 mp.send_to_popup = lambda alert: mp._append_alert(alert)
                 a.send_to_popup = mp.send_to_popup
@@ -636,7 +547,6 @@ class TestFullPipeline:
                 alert = a.fetch_alert()
                 if alert and alert.get("id") and alert["id"] not in a.seen_ids:
                     a.seen_ids.add(alert["id"])
-                    a.log_formatted(alert)
                     a.log_raw(alert)
                     a.send_to_popup(alert)
 
@@ -645,10 +555,6 @@ class TestFullPipeline:
             result = _run_python(code)
             assert result.returncode == 0, result.stderr
             assert "OK" in result.stdout
-
-            # Verify formatted log
-            fmt_content = fmt_log.read_text(encoding="utf-8")
-            assert "999000111" in fmt_content
 
             # Verify raw log
             raw_content = raw_log.read_text(encoding="utf-8")
@@ -663,7 +569,6 @@ class TestFullPipeline:
             server.shutdown()
 
     def test_null_fetch_produces_no_output(self, tmp_path):
-        fmt_log = tmp_path / "fmt.txt"
         raw_log = tmp_path / "raw.txt"
 
         server, port = _start_server(b"")  # empty -> None
@@ -673,7 +578,6 @@ class TestFullPipeline:
                 sys.path.insert(0, {str(PROJECT_DIR)!r})
                 import alert as a
                 a.URL = "http://127.0.0.1:{port}/"
-                a.FORMATTED_LOG = {str(fmt_log)!r}
                 a.RAW_LOG = {str(raw_log)!r}
                 a.ensure_log_files()
 
@@ -685,13 +589,11 @@ class TestFullPipeline:
                 alert = a.fetch_alert()
                 if alert and alert.get("id") and alert["id"] not in a.seen_ids:
                     a.seen_ids.add(alert["id"])
-                    a.log_formatted(alert)
                     a.log_raw(alert)
                 print("OK")
             """)
             result = _run_python(code)
             assert result.returncode == 0, result.stderr
-            assert fmt_log.read_text() == ""
             assert raw_log.read_text() == ""
         finally:
             server.shutdown()

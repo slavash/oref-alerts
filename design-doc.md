@@ -81,7 +81,6 @@ graph TD
     end
 
     subgraph logging_mod[logging]
-        FMTLOG[log_formatted.py<br/>Human-readable log writer]
         RAWLOG[log_raw.py<br/>JSON-per-line log writer]
     end
 
@@ -109,7 +108,6 @@ graph TD
     MAIN --> CFG
     MAIN --> FETCH
     MAIN --> DEDUP
-    MAIN --> FMTLOG
     MAIN --> RAWLOG
     MAIN --> BEEP
     MAIN --> LAUNCHER
@@ -124,7 +122,6 @@ graph TD
     HTML --> CITIES
 
     FETCH --> CFG
-    FMTLOG --> CFG
     RAWLOG --> CFG
     BEEP --> CFG
     IPC_FILE --> CFG
@@ -140,7 +137,6 @@ alert/
     alert_model.py         # Alert dataclass (typed DTO)
     fetcher.py             # fetch_alert() -- HTTP + BOM decode
     dedup.py               # AlertDeduplicator class (encapsulates seen_ids)
-    log_formatted.py       # write_formatted_entry()
     log_raw.py             # write_raw_entry()
     beep.py                # beep_if_local()
     ipc.py                 # append_alert(), read_alerts()
@@ -158,14 +154,12 @@ test_alert_e2e.py          # Existing e2e tests (unchanged, still import top-lev
 
 ### Backward Compatibility Layer
 
-The e2e tests import `alert` and `map_popup` as top-level modules and access attributes like `a.FORMATTED_LOG`, `a.log_formatted`, `mp._append_alert`, `mp._build_html`, `mp.ALERTS_IPC`. The refactored entry-point files (`alert.py`, `map_popup.py`) must re-export all symbols the tests reference:
+The e2e tests import `alert` and `map_popup` as top-level modules and access attributes like `a.RAW_LOG`, `mp._append_alert`, `mp._build_html`, `mp.ALERTS_IPC`. The refactored entry-point files (`alert.py`, `map_popup.py`) must re-export all symbols the tests reference:
 
 | Test accesses | Must remain at |
 |---|---|
 | `alert.URL` | `alert.URL` (delegating to `config`) |
-| `alert.FORMATTED_LOG` | `alert.FORMATTED_LOG` (writable property on module or config) |
 | `alert.RAW_LOG` | `alert.RAW_LOG` |
-| `alert.log_formatted(dict)` | `alert.log_formatted` |
 | `alert.log_raw(dict)` | `alert.log_raw` |
 | `alert.fetch_alert()` | `alert.fetch_alert` |
 | `alert.ensure_log_files()` | `alert.ensure_log_files` |
@@ -189,7 +183,6 @@ class Config:
     api_url: str
     poll_interval: int          # seconds
     http_headers: dict[str, str]
-    formatted_log_path: str
     raw_log_path: str
     my_location: str
     auto_close_seconds: int
@@ -237,13 +230,6 @@ class AlertDeduplicator:
     def mark_seen(self, alert_id: str) -> None: ...
     @property
     def seen_ids(self) -> set[str]: ...
-```
-
-### log_formatted.py
-
-```python
-def write_formatted_entry(alert: dict, log_path: str) -> None:
-    """Append one human-readable log line. Computes estimated arrival from original_countdown."""
 ```
 
 ### log_raw.py
@@ -325,8 +311,8 @@ Define the `Alert` dataclass with `from_dict` / `to_dict`. No callers changed ye
 ### Step 3: Extract `fetcher.py`
 Move `fetch_alert` logic into `fetcher.py`. The function receives `url` and `headers` as parameters. In `alert.py`, replace the body of `fetch_alert()` with a delegation call. Tests still import `alert.fetch_alert` -- it still works.
 
-### Step 4: Extract `log_formatted.py` and `log_raw.py`
-Move logging functions. Each receives the log path as a parameter. The `alert.py` wrappers delegate, passing `FORMATTED_LOG` / `RAW_LOG`.
+### Step 4: Extract `log_raw.py`
+Move raw logging function. It receives the log path as a parameter. The `alert.py` wrapper delegates, passing `RAW_LOG`.
 
 ### Step 5: Extract `beep.py`
 Move `beep_if_local`. It now takes `my_location` as a parameter. The `alert.py` wrapper passes `MY_LOCATION`.
@@ -353,7 +339,7 @@ Move `_run_popup` into `popup.py`, refactored to use `hold_lock` context manager
 
 1. **Python package vs flat files** -- Should the internal modules live in an `alert/` package directory, or remain as flat files alongside the entry points? A package is cleaner but changes the import path. The facade approach works either way; flat files are simpler for this project's scale.
 
-2. **Config override mechanism** -- Should `Config` support env vars or a YAML/TOML file, or is the dataclass + `default_config()` sufficient? Current tests override config by assigning to module attributes (`a.FORMATTED_LOG = ...`). This must keep working.
+2. **Config override mechanism** -- Should `Config` support env vars or a YAML/TOML file, or is the dataclass + `default_config()` sufficient? Current tests override config by assigning to module attributes (`a.RAW_LOG = ...`). This must keep working.
 
 3. **Typed Alert everywhere** -- The e2e tests pass plain dicts. Introducing the `Alert` dataclass internally is clean, but forcing it at the public API boundary would break tests. Recommendation: use dicts at the facade boundary, `Alert` internally only. Conversion happens inside the facade.
 

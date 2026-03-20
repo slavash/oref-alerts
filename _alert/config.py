@@ -25,8 +25,6 @@ class Config:
         "X-Requested-With": "XMLHttpRequest",
         "User-Agent": "Mozilla/5.0",
     })
-    formatted_log_path: str = field(
-        default_factory=lambda: _env("OREF_FORMATTED_LOG", os.path.join(_DIR, "alerts_formatted.txt")))
     raw_log_path: str = field(
         default_factory=lambda: _env("OREF_RAW_LOG", os.path.join(_DIR, "alerts_raw.txt")))
     my_location: str = field(default_factory=lambda: _env("OREF_MY_LOCATION", "חיפה"))
