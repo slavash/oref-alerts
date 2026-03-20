@@ -17,9 +17,11 @@
   .alert-entry { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
   .alert-entry:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
   .alert-entry h2 { font-size: 16px; margin-bottom: 4px; color: #ff4444; }
+  .alert-entry h2.resolved { color: #32c832; }
   .alert-entry .meta { color: #aaa; margin-bottom: 2px; font-size: 13px; }
   .alert-entry .cities { color: #ddd; line-height: 1.4; font-size: 13px; }
   .dot-red { background: rgba(255,50,50,0.85); border: 2px solid #fff; border-radius: 50%; width: 14px; height: 14px; }
+  .dot-green { background: rgba(50,200,50,0.85); border: 2px solid #fff; border-radius: 50%; width: 14px; height: 14px; }
 </style>
 </head>
 <body>
@@ -29,6 +31,8 @@
 <script>
 const ALERTS = /*ALERTS_JSON*/null/*END_ALERTS_JSON*/;
 const CITIES_DB = /*CITIES_JSON*/[]/*END_CITIES_JSON*/;
+
+const END_OF_INCIDENT = '\u05d4\u05d0\u05d9\u05e8\u05d5\u05e2 \u05d4\u05e1\u05ea\u05d9\u05d9\u05dd';
 
 function init() {
   const infoEl = document.getElementById('info');
@@ -54,6 +58,7 @@ function init() {
     const alertCities = alert.data || [];
     const title = alert.title || 'Alert';
     const zone = alert.zone || '';
+    const isEndOfIncident = title === END_OF_INCIDENT;
 
     const resolved = [];
     const unresolved = [];
@@ -64,15 +69,20 @@ function init() {
         const key = Object.keys(lookup).find(k => k.startsWith(prefix));
         if (key) coord = lookup[key];
       }
-      if (coord) { resolved.push({ name, ...coord }); allResolved.push({ name, ...coord }); }
+      if (coord) {
+        const point = { name, ...coord, green: isEndOfIncident };
+        resolved.push(point);
+        allResolved.push(point);
+      }
       else unresolved.push(name);
     });
 
     const meta = `${zone} — ${resolved.length} mapped` +
       (unresolved.length ? ` | ${unresolved.length} not found` : '');
 
+    const titleClass = isEndOfIncident ? ' class="resolved"' : '';
     infoHtml += `<div class="alert-entry">
-      <h2>${title}</h2>
+      <h2${titleClass}>${title}</h2>
       <div class="meta">${meta}</div>
       <div class="cities">${alertCities.join(', ')}</div>
     </div>`;
@@ -121,8 +131,15 @@ function initLeaflet(points, cLat, cLng, sLat, sLng) {
       iconAnchor: [7, 7]
     });
 
+    const greenIcon = L.divIcon({
+      className: '',
+      html: '<div style="background:rgba(50,200,50,0.85);border:2px solid #fff;border-radius:50%;width:14px;height:14px;box-shadow:0 0 8px rgba(0,200,0,0.6);"></div>',
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+
     points.forEach(p => {
-      L.marker([p.lat, p.lng], { icon: redIcon })
+      L.marker([p.lat, p.lng], { icon: p.green ? greenIcon : redIcon })
         .bindTooltip(p.name, { direction: 'top', offset: [0, -10] })
         .addTo(map);
     });
