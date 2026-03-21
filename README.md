@@ -39,6 +39,7 @@ alert/
 ├── history.html             # Alert history page with filters and pagination
 ├── cities.json              # City location database
 ├── alerts_raw.txt           # Raw alert log (sample data included)
+├── oref-ctl.sh              # Start/stop/status script (macOS Launch Agent)
 ├── docs/                    # Project documentation
 │   ├── prd.md               # Product requirements document
 │   └── design-doc.md        # Refactoring design document
@@ -115,14 +116,22 @@ export OREF_POPUP_LOCK="/tmp/oref_popup.lock"   # lock to prevent duplicate popu
 
 ## Usage
 
-### Start the Alert Monitor
+### Background Service (recommended)
+
+Use `oref-ctl.sh` to run the monitor as a macOS Launch Agent. It survives terminal close and auto-restarts on crash.
 
 ```bash
-# With pip / venv
-python alert.py
+./oref-ctl.sh start     # install and start
+./oref-ctl.sh stop      # stop and uninstall
+./oref-ctl.sh restart   # stop + start
+./oref-ctl.sh status    # check if running
+./oref-ctl.sh log       # tail the service log
+```
 
-# With Poetry
-poetry run python alert.py
+### Foreground
+
+```bash
+python alert.py
 ```
 
 The tool will:
