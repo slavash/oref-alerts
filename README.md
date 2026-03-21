@@ -4,13 +4,14 @@ A Python-based alert monitoring system that polls the Israeli OREF (emergency re
 
 ## Features
 
-- **Real-time Alert Polling**: Continuously monitors the OREF alert API for new emergency alerts
+- **Real-time Alert Polling**: Continuously monitors the OREF alert API for new emergency alerts (default: every 2 seconds)
 - **Smart Deduplication**: Automatically eliminates duplicate alert entries
-- **Dual Logging**: Maintains both human-readable and raw JSON logs for easy auditing
+- **Raw JSON Logging**: Appends every alert as a timestamped JSON line to `alerts_raw.txt`
 - **Local Notifications**: Emits an audible beep when your location is affected by an alert
-- **Visual Map Display**: Shows alert locations on an interactive Leaflet-based map in a floating macOS popup
+- **Visual Map Display**: Shows **all** alert locations on an interactive Leaflet-based map in a floating macOS popup
+- **Alert History Page**: Browse past alerts with an interactive map, category/date filters, and pagination (`history.html`)
 - **Automatic Cleanup**: Popup auto-closes after 60 seconds of inactivity
-- **Persistent Storage**: Maintains an IPC JSON file for alert history and inter-process communication
+- **IPC**: A shared JSON file (`/tmp/oref_alerts.json`) allows the poller and popup to communicate; a lock file prevents duplicate popup processes
 
 ## Popup Preview
 
@@ -33,25 +34,27 @@ Paginated alert history view with an interactive map and category/date filters.
 ```
 alert/
 ├── alert.py                 # Main polling loop and entry point
-├── map_popup.py            # macOS appearance API and WebKit popup management
-├── map.html                # Leaflet map template
-├── cities.json             # City location database
-├── design-doc.md           # Refactoring design document
-├── test_alert_e2e.py       # End-to-end test suite
-├── _alert/                 # Main package
+├── map_popup.py             # macOS WebKit popup management
+├── map.html                 # Leaflet map template (popup)
+├── history.html             # Alert history page with filters and pagination
+├── cities.json              # City location database
+├── alerts_raw.txt           # Raw alert log (sample data included)
+├── design-doc.md            # Refactoring design document
+├── test_alert_e2e.py        # End-to-end test suite
+├── _alert/                  # Main package
 │   ├── __init__.py
-│   ├── alert_model.py      # Alert data model
-│   ├── beep.py             # Audio notification via osascript
-│   ├── cities.py           # City lookup and management
-│   ├── config.py           # Centralized configuration
-│   ├── dedup.py            # Alert deduplication logic
-│   ├── fetcher.py          # OREF API client
-│   ├── html_builder.py     # Map HTML generation
-│   ├── ipc.py              # Inter-process communication
-│   ├── lock.py             # File locking utilities
-│   ├── log_raw.py          # Raw JSON logging
-│   ├── popup.py            # Popup window management
-│   └── popup_launcher.py   # Process lifecycle
+│   ├── alert_model.py       # Alert data model
+│   ├── beep.py              # Audio notification via osascript
+│   ├── cities.py            # City lookup and management
+│   ├── config.py            # Centralized configuration
+│   ├── dedup.py             # Alert deduplication logic
+│   ├── fetcher.py           # OREF API client
+│   ├── html_builder.py      # Map HTML generation
+│   ├── ipc.py               # Inter-process communication
+│   ├── lock.py              # File locking utilities
+│   ├── log_raw.py           # Raw JSON logging
+│   ├── popup.py             # Popup window management
+│   └── popup_launcher.py    # Process lifecycle
 
 ```
 
@@ -72,7 +75,7 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 
-# Set your location
+# Set your location (default: חיפה)
 export OREF_MY_LOCATION="חיפה"
 ```
 
@@ -83,7 +86,7 @@ cd alert
 
 poetry install
 
-# Set your location
+# Set your location (default: חיפה)
 export OREF_MY_LOCATION="חיפה"
 ```
 
@@ -92,19 +95,20 @@ export OREF_MY_LOCATION="חיפה"
 Configuration is centralized in `_alert/config.py` and can be overridden via environment variables:
 
 ```bash
-# API Configuration
-export OREF_API_URL="https://api.oref.org.il/..."
-export POLL_INTERVAL="30"  # seconds
+# API
+export OREF_API_URL="https://www.oref.org.il/WarningMessages/Alert/alerts.json"
+export OREF_POLL_INTERVAL="2"        # seconds
 
 # Notifications
-export MY_LOCATION="Your City Name"
+export OREF_MY_LOCATION="חיפה"       # beep when this city appears in an alert
 
-# Popup Behavior
-export AUTO_CLOSE_SECONDS="60"
+# Popup
+export OREF_AUTO_CLOSE_SECONDS="60"
 
-# Logging
-export RAW_LOG_PATH="~/.alert_raw.log"
-export ALERTS_IPC_FILE="~/.alert_ipc.json"
+# Logging & IPC
+export OREF_RAW_LOG="alerts_raw.txt"           # raw JSON log path
+export OREF_ALERTS_IPC="/tmp/oref_alerts.json"  # IPC file for popup communication
+export OREF_POPUP_LOCK="/tmp/oref_popup.lock"   # lock to prevent duplicate popups
 ```
 
 ## Usage
@@ -120,40 +124,48 @@ poetry run python alert.py
 ```
 
 The tool will:
-1. Start polling the OREF API at regular intervals
-2. Display a floating map popup for each new alert affecting your location
-3. Log all alerts to both formatted and raw log files
-4. Beep when an alert is detected for your city
+1. Start polling the OREF API every 2 seconds
+2. Display a floating map popup for every new alert
+3. Log all alerts to `alerts_raw.txt`
+4. Beep when an alert is detected for your configured location
 
-### View Logs
+### View Raw Log
 
 ```bash
-# Human-readable formatted log
-tail -f ~/.alert_formatted.log
-
-# Raw JSON log
-tail -f ~/.alert_raw.log
+tail -f alerts_raw.txt
 ```
 
-### Check Latest Alerts (IPC)
+### IPC
+
+The poller and popup process communicate through a shared JSON file at `/tmp/oref_alerts.json`:
+
+- The poller appends each new alert to this file via `_alert/ipc.py`.
+- The popup process polls this file every second to pick up new alerts and update the map.
+- A lock file (`/tmp/oref_popup.lock`) ensures only one popup process runs at a time.
+
+The IPC file is created on the first alert and cleared when the popup closes. You can inspect it manually:
 
 ```bash
-cat ~/.alert_ipc.json | jq '.'
+cat /tmp/oref_alerts.json | jq '.'
+```
+
+### Alert Data Sample
+
+`alerts_raw.txt` contains example alert data captured from the OREF API. Each line is a timestamped JSON entry:
+
+```
+[2026-03-20 02:48:40] {"id": "134184413140000000", "cat": "1", "title": "ירי רקטות וטילים", "data": ["חיפה - כרמל, הדר ועיר תחתית", ...], "desc": "היכנסו למרחב המוגן"}
 ```
 
 ## Log Format
 
-### Formatted Log
+Each line in `alerts_raw.txt` follows this format:
 
 ```
-[2026-03-20 14:30:45] ID: 12345 | Title: זהירות | Zone: תל אביב | Areas: אזור מרכז | ETA: 10 דקות
+[YYYY-MM-DD HH:MM:SS] {JSON alert object}
 ```
 
-### Raw JSON Log
-
-```json
-{"timestamp": "2026-03-20T14:30:45Z", "id": 12345, "title": "זהירות", "zone": "תל אביב", "areas": ["אזור מרכז"], "estimated_time": "10 דקות"}
-```
+The JSON alert object mirrors the OREF API response with fields: `id`, `cat`, `title`, `data` (list of affected cities), and `desc`.
 
 ## Architecture
 
@@ -163,11 +175,11 @@ The project follows a modular, testable architecture with clear separation of co
 - **Data Models** (`alert_model.py`): Type-safe alert representation
 - **API Integration** (`fetcher.py`): Handles HTTP requests and response parsing
 - **Deduplication** (`dedup.py`): Stateful deduplication logic
-- **Logging** (`log_raw.py`): JSON-per-line log persistence
+- **Logging** (`log_raw.py`): Timestamped JSON-per-line log persistence
 - **Notifications** (`beep.py`): Audio alerts via osascript
-- **IPC** (`ipc.py`, `lock.py`): Inter-process communication with file locking
+- **IPC** (`ipc.py`, `lock.py`): Shared JSON file for poller-popup communication, with file locking
 - **UI** (`popup_launcher.py`, `popup.py`): macOS WebKit popup management
-- **HTML** (`html_builder.py`): Leaflet map template rendering
+- **HTML** (`html_builder.py`, `map.html`, `history.html`): Leaflet map rendering
 - **Cities** (`cities.py`): Location database with lookup utilities
 
 See [design-doc.md](design-doc.md) for detailed architectural rationale.
@@ -197,17 +209,15 @@ Tests verify:
 
 ### Popup not appearing
 - Check that the popup process is running: `ps aux | grep popup`
-- Verify file permissions on `~/.alert_ipc*.json`
-- Check system logs: `log show --predicate 'process == "alert"'`
+- Verify file permissions on `/tmp/oref_alerts.json` and `/tmp/oref_popup.lock`
 
 ### No beep on alerts
 - Ensure `osascript` is available: `which osascript`
-- Verify `MY_LOCATION` environment variable is set correctly
-- Check that the alert's affected areas match your location
+- Verify `OREF_MY_LOCATION` environment variable matches a city name in `cities.json`
 
 ### Missing alerts
-- Verify network connectivity: `curl https://api.oref.org.il/...`
-- Check formatted and raw logs for parsing errors
+- Verify network connectivity to the OREF API
+- Check `alerts_raw.txt` for recent entries
 - Review `_alert/fetcher.py` for API schema changes
 
 ## Dependencies
