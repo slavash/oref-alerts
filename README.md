@@ -2,6 +2,23 @@
 
 A Python-based alert monitoring system that polls the Israeli OREF (emergency readiness) alert API, deduplicates alerts, logs them, and displays active alerts on an interactive macOS map popup.
 
+## Table of Contents
+
+- [Features](#features)
+- [Popup Preview](#popup-preview)
+- [Alert History](#alert-history)
+- [Project Structure](#project-structure)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Log Format](#log-format)
+- [Architecture](#architecture)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Dependencies](#dependencies)
+- [License](#license)
+- [References](#references)
+
 ## Features
 
 - **Real-time Alert Polling**: Continuously monitors the OREF alert API for new emergency alerts (default: every 2 seconds)
