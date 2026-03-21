@@ -23,12 +23,6 @@ def run_popup(config: Config) -> None:  # pylint: disable=too-many-locals,too-ma
         seen_count = len(alerts)
         html = build_html(alerts, cities_db, config.map_template_path)
 
-        class AppDelegate(NSObject):  # pylint: disable=too-few-public-methods
-            """Minimal NSApp delegate."""
-
-            def applicationDidFinishLaunching_(self, _note):  # pylint: disable=invalid-name
-                """Called when the application finishes launching."""
-
         app = AppKit.NSApplication.sharedApplication()
         app.setActivationPolicy_(AppKit.NSApplicationActivationPolicyAccessory)
 
@@ -56,12 +50,10 @@ def run_popup(config: Config) -> None:  # pylint: disable=too-many-locals,too-ma
         )
 
         webview = WebKit.WKWebView.alloc().initWithFrame_(((0, 0), (w, h)))
-        webview.loadHTMLString_baseURL_(html, NSURL.URLWithString_("about:blank"))
+        # about:blank blocks or breaks HTTPS subresources (Leaflet CDN, map tiles) in WKWebView.
+        html_base = NSURL.URLWithString_("https://www.openstreetmap.org/")
+        webview.loadHTMLString_baseURL_(html, html_base)
         window.setContentView_(webview)
-
-        delegate = AppDelegate.alloc().init()
-        app.setDelegate_(delegate)
-        window.orderFrontRegardless()
 
         close_timer_holder = [None]
         ipc_path = config.alerts_ipc_path
@@ -90,6 +82,24 @@ def run_popup(config: Config) -> None:  # pylint: disable=too-many-locals,too-ma
 
         schedule_close()
 
+        class AppDelegate(NSObject):  # pylint: disable=too-few-public-methods
+            """NSApplication and NSWindow delegate."""
+
+            def applicationDidFinishLaunching_(self, _note):  # pylint: disable=invalid-name
+                """Called when the application finishes launching."""
+
+            def windowWillClose_(self, _notification):  # pylint: disable=invalid-name
+                if close_timer_holder[0] is not None:
+                    close_timer_holder[0].invalidate()
+                    close_timer_holder[0] = None
+                _cleanup()
+                app.stop_(None)
+
+        delegate = AppDelegate.alloc().init()
+        app.setDelegate_(delegate)
+        window.setDelegate_(delegate)
+        window.orderFrontRegardless()
+
         def poll_alerts(_timer):
             nonlocal seen_count, alerts
             current = read_alerts(ipc_path)
@@ -97,9 +107,7 @@ def run_popup(config: Config) -> None:  # pylint: disable=too-many-locals,too-ma
                 alerts = current
                 seen_count = len(current)
                 new_html = build_html(alerts, cities_db, config.map_template_path)
-                webview.loadHTMLString_baseURL_(
-                    new_html, NSURL.URLWithString_("about:blank")
-                )
+                webview.loadHTMLString_baseURL_(new_html, html_base)
                 schedule_close()
 
         NSTimer.scheduledTimerWithTimeInterval_repeats_block_(1.0, True, poll_alerts)

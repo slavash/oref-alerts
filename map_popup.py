@@ -16,6 +16,7 @@ import sys
 
 from _alert.config import default_config
 from _alert.ipc import append_alert as _append_alert_impl
+from _alert.ipc import write_alerts as _write_alerts_impl
 from _alert.cities import load_cities
 from _alert.html_builder import build_html
 from _alert.popup_launcher import send_to_popup as _send_to_popup_impl
@@ -49,6 +50,11 @@ def _append_alert(alert_data: dict) -> None:
     _append_alert_impl(alert_data, ALERTS_IPC)
 
 
+def _set_alerts_standalone(alert_data: dict) -> None:
+    """Replace IPC with a single alert (CLI standalone; avoids stale append duplicates)."""
+    _write_alerts_impl([alert_data], ALERTS_IPC)
+
+
 def send_to_popup(alert_data: dict) -> None:
     """Send *alert_data* to the popup process."""
     _send_to_popup_impl(alert_data, _config)
@@ -66,7 +72,7 @@ if __name__ == "__main__":
         from _alert.beep import beep_if_local  # pylint: disable=import-outside-toplevel
         alert = json.loads(sys.argv[1])
         beep_if_local(alert, MY_LOCATION)
-        _append_alert(alert)
+        _set_alerts_standalone(alert)
         _run_popup()
     else:
         print("Usage: python3 map_popup.py --popup | '<alert_json>'")

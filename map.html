@@ -6,26 +6,16 @@
 <title>Alert Map</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #1a1a1a; color: #fff; }
-  #map { width: 100vw; height: 100vh; }
-  #info {
-    position: absolute; top: 12px; left: 12px; right: 12px;
-    background: rgba(30,30,30,0.92); backdrop-filter: blur(10px);
-    border-radius: 12px; padding: 14px 18px; z-index: 10;
-    font-size: 14px; max-height: 38vh; overflow-y: auto;
+  html, body { height: 100%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #1a1a1a; }
+  #map { height: 100%; width: 100%; }
+  #map .no-data {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; color: #ff4444; font-size: 15px;
   }
-  .alert-entry { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-  .alert-entry:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
-  .alert-entry h2 { font-size: 16px; margin-bottom: 4px; color: #ff4444; }
-  .alert-entry h2.resolved { color: #32c832; }
-  .alert-entry .meta { color: #aaa; margin-bottom: 2px; font-size: 13px; }
-  .alert-entry .cities { color: #ddd; line-height: 1.4; font-size: 13px; }
-  .dot-red { background: rgba(255,50,50,0.85); border: 2px solid #fff; border-radius: 50%; width: 14px; height: 14px; }
-  .dot-green { background: rgba(50,200,50,0.85); border: 2px solid #fff; border-radius: 50%; width: 14px; height: 14px; }
 </style>
 </head>
 <body>
-<div id="info"></div>
 <div id="map"></div>
 
 <script>
@@ -34,10 +24,15 @@ const CITIES_DB = /*CITIES_JSON*/[]/*END_CITIES_JSON*/;
 
 const END_OF_INCIDENT = '\u05d4\u05d0\u05d9\u05e8\u05d5\u05e2 \u05d4\u05e1\u05ea\u05d9\u05d9\u05dd';
 
+/** OREF sometimes sends shortened names; map to cities.json keys. */
+const CITY_NAME_ALIASES = {
+  '\u05e2\u05db': '\u05e2\u05db\u05d5', // עכ -> עכו
+};
+
 function init() {
-  const infoEl = document.getElementById('info');
+  const mapEl = document.getElementById('map');
   if (!ALERTS || !ALERTS.length) {
-    infoEl.innerHTML = '<h2 style="color:#ff4444">No alert data</h2>';
+    mapEl.innerHTML = '<div class="no-data">No alert data</div>';
     return;
   }
 
@@ -52,17 +47,13 @@ function init() {
 
   const allResolved = [];
 
-  // Render info entries for each alert
-  let infoHtml = '';
-  ALERTS.forEach((alert, idx) => {
+  ALERTS.forEach((alert) => {
     const alertCities = alert.data || [];
     const title = alert.title || 'Alert';
-    const zone = alert.zone || '';
     const isEndOfIncident = title === END_OF_INCIDENT;
 
-    const resolved = [];
-    const unresolved = [];
-    alertCities.forEach(name => {
+    alertCities.forEach(rawName => {
+      const name = CITY_NAME_ALIASES[rawName] || rawName;
       let coord = lookup[name];
       if (!coord) {
         const prefix = name + ' - ';
@@ -70,42 +61,24 @@ function init() {
         if (key) coord = lookup[key];
       }
       if (coord) {
-        const point = { name, ...coord, green: isEndOfIncident };
-        resolved.push(point);
+        const point = { name: rawName, ...coord, green: isEndOfIncident };
         allResolved.push(point);
       }
-      else unresolved.push(name);
     });
-
-    const meta = `${zone} — ${resolved.length} mapped` +
-      (unresolved.length ? ` | ${unresolved.length} not found` : '');
-
-    const titleClass = isEndOfIncident ? ' class="resolved"' : '';
-    infoHtml += `<div class="alert-entry">
-      <h2${titleClass}>${title}</h2>
-      <div class="meta">${meta}</div>
-      <div class="cities">${alertCities.join(', ')}</div>
-    </div>`;
   });
-  infoEl.innerHTML = infoHtml;
 
-  if (allResolved.length === 0) return;
+  if (allResolved.length === 0) {
+    mapEl.innerHTML = '<div class="no-data">No locations matched cities database</div>';
+    return;
+  }
 
-  // Compute bounds
-  let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
-  allResolved.forEach(p => {
-    minLat = Math.min(minLat, p.lat); maxLat = Math.max(maxLat, p.lat);
-    minLng = Math.min(minLng, p.lng); maxLng = Math.max(maxLng, p.lng);
-  });
-  const centerLat = (minLat + maxLat) / 2;
-  const centerLng = (minLng + maxLng) / 2;
-  const spanLat = Math.max((maxLat - minLat) * 1.3, 0.05);
-  const spanLng = Math.max((maxLng - minLng) * 1.3, 0.05);
-
-  initLeaflet(allResolved, centerLat, centerLng, spanLat, spanLng);
+  initLeaflet(allResolved);
 }
 
-function initLeaflet(points, cLat, cLng, sLat, sLng) {
+/** Max zoom after fit: ~city / metro (street level is typically z14+). */
+const MAP_MAX_ZOOM_CITY = 11;
+
+function initLeaflet(points) {
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
@@ -114,15 +87,25 @@ function initLeaflet(points, cLat, cLng, sLat, sLng) {
   const script = document.createElement('script');
   script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
   script.onload = () => {
-    const map = L.map('map', { zoomControl: true }).setView([cLat, cLng], 9);
+    const first = points[0];
+    const map = L.map('map', { zoomControl: true }).setView([first.lat, first.lng], 10);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 18
     }).addTo(map);
 
-    const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
-    map.fitBounds(bounds.pad(0.15));
+    let bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    const minSpan = 0.055;
+    const latSpan = Math.max(ne.lat - sw.lat, minSpan);
+    const lngSpan = Math.max(ne.lng - sw.lng, minSpan);
+    const c = bounds.getCenter();
+    bounds = L.latLngBounds(
+      [c.lat - latSpan / 2, c.lng - lngSpan / 2],
+      [c.lat + latSpan / 2, c.lng + lngSpan / 2]
+    );
 
     const redIcon = L.divIcon({
       className: '',
@@ -142,6 +125,21 @@ function initLeaflet(points, cLat, cLng, sLat, sLng) {
       L.marker([p.lat, p.lng], { icon: p.green ? greenIcon : redIcon })
         .bindTooltip(p.name, { direction: 'top', offset: [0, -10] })
         .addTo(map);
+    });
+
+    const resizeAndFit = () => {
+      map.invalidateSize();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, {
+          padding: [28, 28],
+          maxZoom: MAP_MAX_ZOOM_CITY,
+        });
+      }
+    };
+    map.whenReady(() => {
+      resizeAndFit();
+      requestAnimationFrame(resizeAndFit);
+      setTimeout(resizeAndFit, 150);
     });
   };
   document.head.appendChild(script);
