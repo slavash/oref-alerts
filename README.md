@@ -39,7 +39,9 @@ alert/
 ├── history.html             # Alert history page with filters and pagination
 ├── cities.json              # City location database
 ├── alerts_raw.txt           # Raw alert log (sample data included)
-├── design-doc.md            # Refactoring design document
+├── docs/                    # Project documentation
+│   ├── prd.md               # Product requirements document
+│   └── design-doc.md        # Refactoring design document
 ├── test_alert_e2e.py        # End-to-end test suite
 ├── _alert/                  # Main package
 │   ├── __init__.py
@@ -182,7 +184,7 @@ The project follows a modular, testable architecture with clear separation of co
 - **HTML** (`html_builder.py`, `map.html`, `history.html`): Leaflet map rendering
 - **Cities** (`cities.py`): Location database with lookup utilities
 
-See [design-doc.md](design-doc.md) for detailed architectural rationale.
+See [docs/design-doc.md](docs/design-doc.md) for detailed architectural rationale.
 
 ## Testing
 
@@ -239,4 +241,4 @@ This project is provided as-is for personal use. Ensure compliance with OREF API
 
 ---
 
-For architecture details and refactoring rationale, see [design-doc.md](design-doc.md).
+For product requirements, see [docs/prd.md](docs/prd.md). For architecture details, see [docs/design-doc.md](docs/design-doc.md).

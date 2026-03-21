@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OREF alert tool polls a government alert API, deduplicates alerts, logs them in two formats (human-readable and raw JSON), triggers a local beep when the user's city is affected, and displays alerts on a floating macOS map popup via WebKit.
+The OREF alert tool polls a government alert API, deduplicates alerts, logs them as raw JSON, triggers a local beep when the user's city is affected, and displays alerts on a floating macOS map popup via WebKit.
 
 The current implementation lives in two files (`alert.py` ~98 LOC, `map_popup.py` ~253 LOC) plus an HTML template. It works, but concentrates many responsibilities per file, uses module-level mutable state, hardcodes configuration, and makes testing possible only through subprocess invocation (the e2e tests all shell out because the modules are not injectable).
 
@@ -11,7 +11,6 @@ The current implementation lives in two files (`alert.py` ~98 LOC, `map_popup.py
 ### Functional (preserved -- e2e tests must pass)
 - Poll OREF API, decode utf-8-sig responses
 - Deduplicate alerts by ID
-- Write formatted log entries (timestamp, id, title, zone, areas, estimated time)
 - Write raw JSON log entries (timestamp + JSON per line)
 - Beep via `osascript` when `MY_LOCATION` appears in alert data
 - Append alert to IPC JSON file
@@ -33,7 +32,7 @@ The current implementation lives in two files (`alert.py` ~98 LOC, `map_popup.py
 
 | File | Responsibilities |
 |---|---|
-| `alert.py` | HTTP fetching, JSON parsing, BOM stripping, formatted logging, raw logging, beep notification, deduplication state, poll loop, file creation |
+| `alert.py` | HTTP fetching, JSON parsing, BOM stripping, raw logging, beep notification, deduplication state, poll loop, file creation |
 | `map_popup.py` | IPC file management, file locking, process lifecycle, cities DB loading/caching, HTML template rendering, macOS AppKit/WebKit window management, signal handling, CLI entry point |
 
 Both files violate SRP heavily.
@@ -131,25 +130,27 @@ graph TD
 ### Package Layout
 
 ```
-alert/
+alert.py               # main() poll loop -- thin facade / orchestrator
+map_popup.py           # CLI entry for popup (preserves current CLI contract)
+map.html               # Leaflet map template
+history.html           # Alert history page with filters and pagination
+cities.json            # City database
+alerts_raw.txt         # Raw alert log (sample data included)
+test_alert_e2e.py      # E2e tests (import top-level alert and map_popup)
+_alert/                # Internal package
     __init__.py
-    config.py              # All settings: paths, URLs, intervals, location
-    alert_model.py         # Alert dataclass (typed DTO)
-    fetcher.py             # fetch_alert() -- HTTP + BOM decode
-    dedup.py               # AlertDeduplicator class (encapsulates seen_ids)
-    log_raw.py             # write_raw_entry()
-    beep.py                # beep_if_local()
-    ipc.py                 # append_alert(), read_alerts()
-    lock.py                # try_acquire_lock(), LockContext
-    html_builder.py        # build_html(alerts, cities)
-    cities.py              # load_cities(path) -> list[dict]
-    popup.py               # run_popup() -- AppKit/WebKit (standalone process)
-    popup_launcher.py      # send_to_popup() -- spawn/reuse popup process
-    alert.py               # main() poll loop -- thin orchestrator
-    map_popup.py           # CLI entry for popup (preserves current CLI contract)
-    map.html               # Leaflet template (unchanged)
-    cities.json            # City database (unchanged)
-test_alert_e2e.py          # Existing e2e tests (unchanged, still import top-level alert and map_popup)
+    config.py          # All settings: paths, URLs, intervals, location
+    alert_model.py     # Alert dataclass (typed DTO)
+    fetcher.py         # fetch_alert() -- HTTP + BOM decode
+    dedup.py           # AlertDeduplicator class (encapsulates seen_ids)
+    log_raw.py         # write_raw_entry()
+    beep.py            # beep_if_local()
+    ipc.py             # append_alert(), read_alerts()
+    lock.py            # try_acquire_lock(), LockContext
+    html_builder.py    # build_html(alerts, cities)
+    cities.py          # load_cities(path) -> list[dict]
+    popup.py           # run_popup() -- AppKit/WebKit (standalone process)
+    popup_launcher.py  # send_to_popup() -- spawn/reuse popup process
 ```
 
 ### Backward Compatibility Layer
@@ -335,14 +336,14 @@ Move `_run_popup` into `popup.py`, refactored to use `hold_lock` context manager
 ### Step 11: Clean up facade files
 `alert.py` and `map_popup.py` become thin facades: imports + re-exports + the `main()` / CLI entry points. Verify all 26 e2e tests pass.
 
-## Open Questions
+## Resolved Design Decisions
 
-1. **Python package vs flat files** -- Should the internal modules live in an `alert/` package directory, or remain as flat files alongside the entry points? A package is cleaner but changes the import path. The facade approach works either way; flat files are simpler for this project's scale.
+1. **Python package vs flat files** -- Internal modules live in a `_alert/` package. Entry points (`alert.py`, `map_popup.py`) remain at the top level as thin facades.
 
-2. **Config override mechanism** -- Should `Config` support env vars or a YAML/TOML file, or is the dataclass + `default_config()` sufficient? Current tests override config by assigning to module attributes (`a.RAW_LOG = ...`). This must keep working.
+2. **Config override mechanism** -- `Config` dataclass with env var overrides via `default_config()`. Tests override config by assigning to module attributes (`a.RAW_LOG = ...`).
 
-3. **Typed Alert everywhere** -- The e2e tests pass plain dicts. Introducing the `Alert` dataclass internally is clean, but forcing it at the public API boundary would break tests. Recommendation: use dicts at the facade boundary, `Alert` internally only. Conversion happens inside the facade.
+3. **Typed Alert everywhere** -- Dicts at the facade boundary, `Alert` dataclass available internally. E2e tests pass plain dicts.
 
 ---
 
-**Status: Awaiting approval before implementation begins.**
+**Status: Implementation complete.**

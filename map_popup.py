@@ -63,7 +63,9 @@ if __name__ == "__main__":
     if len(sys.argv) >= 2 and sys.argv[1] == "--popup":
         _run_popup()
     elif len(sys.argv) >= 2:
+        from _alert.beep import beep_if_local  # pylint: disable=import-outside-toplevel
         alert = json.loads(sys.argv[1])
+        beep_if_local(alert, MY_LOCATION)
         _append_alert(alert)
         _run_popup()
     else:
