@@ -22,6 +22,12 @@ The popup displays:
 - City/region information overlaid on the map
 - Automatic scrolling updates as new alerts arrive
 
+## Alert History
+
+![Alert History List](screenshots/alerts-list.png)
+
+Paginated alert history view with an interactive map and category/date filters.
+
 ## Project Structure
 
 ```
