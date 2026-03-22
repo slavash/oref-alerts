@@ -9,7 +9,8 @@ from datetime import datetime
 from _alert.config import default_config
 from _alert.dedup import AlertDeduplicator
 from _alert.fetcher import fetch_alert as _fetch_alert
-from _alert.log_raw import write_raw_entry
+from _alert.log_raw import write_raw_entry, append_history_json
+from _alert.history_builder import rebuild_history_html
 from _alert.beep import beep_if_local as _beep_if_local
 from map_popup import send_to_popup, MY_LOCATION
 
@@ -19,6 +20,7 @@ URL = _config.api_url
 POLL_INTERVAL = _config.poll_interval
 HEADERS = dict(_config.http_headers)
 RAW_LOG = _config.raw_log_path
+HISTORY_JSON = _config.history_json_path
 
 _dedup = AlertDeduplicator()
 seen_ids = _dedup.seen_ids
@@ -57,6 +59,9 @@ def main() -> None:
             seen_ids.add(alert["id"])
             print(f"[{datetime.now():%H:%M:%S}] new alert: {alert['id']}")
             log_raw(alert)
+            append_history_json(alert, HISTORY_JSON)
+            rebuild_history_html(
+                _config.history_html_path, HISTORY_JSON, _config.cities_json_path)
             beep_if_local(alert)
             send_to_popup(alert)
         time.sleep(POLL_INTERVAL)

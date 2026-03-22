@@ -42,7 +42,10 @@ def run_popup(config: Config) -> None:  # pylint: disable=too-many-locals,too-ma
             AppKit.NSBackingStoreBuffered,
             False,
         )
-        window.setTitle_(alerts[0].get("title", "Alert") if alerts else "Alert")
+        from datetime import datetime  # pylint: disable=import-outside-toplevel
+        now = datetime.now().strftime("%H:%M:%S")
+        title = alerts[0].get("title", "Alert") if alerts else "Alert"
+        window.setTitle_(f"{now} — {title}")
         window.setLevel_(AppKit.NSFloatingWindowLevel)
         window.setCollectionBehavior_(
             AppKit.NSWindowCollectionBehaviorCanJoinAllSpaces
@@ -56,25 +59,43 @@ def run_popup(config: Config) -> None:  # pylint: disable=too-many-locals,too-ma
         window.setContentView_(webview)
 
         close_timer_holder = [None]
+        poll_timer_holder = [None]
         ipc_path = config.alerts_ipc_path
-        lock_path = config.popup_lock_path
         auto_close = config.auto_close_seconds
 
         def _cleanup():
-            for path in (ipc_path, lock_path):
-                try:
-                    os.remove(path)
-                except OSError:
-                    pass
+            try:
+                os.remove(ipc_path)
+            except OSError:
+                pass
+
+        def _shutdown():
+            """Invalidate all timers, clean up, and stop the app."""
+            if poll_timer_holder[0] is not None:
+                poll_timer_holder[0].invalidate()
+                poll_timer_holder[0] = None
+            if close_timer_holder[0] is not None:
+                close_timer_holder[0].invalidate()
+                close_timer_holder[0] = None
+            _cleanup()
+            app.stop_(None)
+            # Post a dummy event so the run loop processes the stop.
+            _other = "otherEventWithType_location_modifierFlags_"
+            _other += "timestamp_windowNumber_context_subtype_data1_data2_"
+            _mk_event = getattr(AppKit.NSEvent, _other)  # pylint: disable=no-member
+            event = _mk_event(
+                AppKit.NSEventTypeApplicationDefined,
+                (0, 0), 0, 0, 0, None, 0, 0, 0,
+            )
+            app.postEvent_atStart_(event, True)
 
         def schedule_close():
             if close_timer_holder[0] is not None:
                 close_timer_holder[0].invalidate()
 
             def do_close(_timer):
-                _cleanup()
                 window.close()
-                app.stop_(None)
+                _shutdown()
 
             close_timer_holder[0] = NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
                 float(auto_close), False, do_close
@@ -89,11 +110,8 @@ def run_popup(config: Config) -> None:  # pylint: disable=too-many-locals,too-ma
                 """Called when the application finishes launching."""
 
             def windowWillClose_(self, _notification):  # pylint: disable=invalid-name
-                if close_timer_holder[0] is not None:
-                    close_timer_holder[0].invalidate()
-                    close_timer_holder[0] = None
-                _cleanup()
-                app.stop_(None)
+                """Handle window close."""
+                _shutdown()
 
         delegate = AppDelegate.alloc().init()
         app.setDelegate_(delegate)
@@ -110,11 +128,11 @@ def run_popup(config: Config) -> None:  # pylint: disable=too-many-locals,too-ma
                 webview.loadHTMLString_baseURL_(new_html, html_base)
                 schedule_close()
 
-        NSTimer.scheduledTimerWithTimeInterval_repeats_block_(1.0, True, poll_alerts)
+        poll_timer_holder[0] = NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
+            1.0, True, poll_alerts)
 
         def handle_term(*_):
-            _cleanup()
-            app.stop_(None)
+            _shutdown()
 
         signal.signal(signal.SIGTERM, handle_term)
         app.run()

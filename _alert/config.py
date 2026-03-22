@@ -40,6 +40,12 @@ class Config:  # pylint: disable=too-many-instance-attributes
         default_factory=lambda: _env("OREF_CITIES_JSON", os.path.join(_DIR, "cities.json")))
     map_template_path: str = field(
         default_factory=lambda: _env("OREF_MAP_TEMPLATE", os.path.join(_DIR, "map.html")))
+    history_json_path: str = field(
+        default_factory=lambda: _env(
+            "OREF_HISTORY_JSON", os.path.join(_DIR, "alerts_history.json")))
+    history_html_path: str = field(
+        default_factory=lambda: _env(
+            "OREF_HISTORY_HTML", os.path.join(_DIR, "history.html")))
     venv_python_path: str = field(
         default_factory=lambda: _env(
             "OREF_VENV_PYTHON", os.path.join(_DIR, ".venv", "bin", "python3")))
