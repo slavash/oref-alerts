@@ -9,6 +9,10 @@ jobs = 1
 disable =
     import-error
 
+[TYPECHECK]
+# PyObjC modules resolve members at runtime via Objective-C bridges
+generated-members = AppKit.*,WebKit.*,Foundation.*
+
 [FORMAT]
 max-line-length = 100
 

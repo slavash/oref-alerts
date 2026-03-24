@@ -15,7 +15,7 @@ def run_popup(config: Config) -> None:  # pylint: disable=too-many-locals,too-ma
     """Launch a floating WebKit popup showing alert locations on a Leaflet map."""
     import AppKit  # pylint: disable=import-outside-toplevel,import-error
     import WebKit  # pylint: disable=import-outside-toplevel,import-error
-    from Foundation import NSObject, NSURL, NSTimer  # pylint: disable=import-outside-toplevel,import-error
+    from Foundation import NSObject, NSURL, NSTimer  # pylint: disable=import-outside-toplevel,import-error,no-name-in-module
 
     with hold_lock(config.popup_lock_path) as _lock_fd:
         alerts = read_alerts(config.alerts_ipc_path)
